@@ -1,0 +1,121 @@
+{
+  "name": "Smart Commute Assistant (Resilient)",
+  "nodes": [
+    {
+      "parameters": { "rule": "0 0 7,18 * * *" },
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const hour = new Date().getHours();\nif (hour < 12) {\n  return [{ json: { origin: 'HomeAddress', destination: 'OfficeAddress' } }];\n} else {\n  return [{ json: { origin: 'OfficeAddress', destination: 'HomeAddress' } }];\n}"
+      },
+      "name": "Dynamic Route Selector",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [450, 200]
+    },
+    {
+      "parameters": {
+        "url": "https://api.openweathermap.org/data/2.5/weather?q=Bangalore&appid={{$credentials.openWeatherApi}}&units=metric",
+        "options": { "continueOnFail": true }
+      },
+      "name": "Weather API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [450, 400],
+      "credentials": { "httpBasicAuth": "OpenWeather API" }
+    },
+    {
+      "parameters": {
+        "url": "https://brightdata-mock-endpoint.com/traffic-news",
+        "responseFormat": "json",
+        "options": { "continueOnFail": true }
+      },
+      "name": "Traffic News",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [650, 400]
+    },
+    {
+      "parameters": {
+        "url": "=https://maps.googleapis.com/maps/api/directions/json?origin={{$json[\"origin\"]}}&destination={{$json[\"destination\"]}}&alternatives=true&departure_time=now&traffic_model=best_guess&key={{$credentials.googleMapsApi}}",
+        "responseFormat": "json",
+        "options": { "continueOnFail": true }
+      },
+      "name": "Google Maps Routes",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [850, 200],
+      "credentials": { "httpBasicAuth": "Google Maps API" }
+    },
+    {
+      "parameters": {
+        "mode": "mergeByPosition"
+      },
+      "name": "Merge Data",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 1,
+      "position": [850, 400]
+    },
+    {
+      "parameters": {
+        "functionCode": "const weather = items[1]?.json || { main: { temp: 26 }, weather: [{ description: 'sunny' }] };\nconst traffic = items[2]?.json || { alerts: ['No major incidents reported'] };\nconst routes = items[0]?.json?.routes || [ { summary: 'Mock Route', legs: [ { duration_in_traffic: { text: '45 mins', value: 2700 } } ] } ];\n\nlet bestRoute = routes[0];\n\nreturn [{\n  json: {\n    route: bestRoute.summary,\n    duration: bestRoute.legs[0].duration_in_traffic?.text || '45 mins',\n    weather: `${weather.weather[0].description}, ${weather.main.temp}°C`,\n    alert: traffic.alerts[0] || 'No alerts',\n    message: `🚗 Best Route: ${bestRoute.summary} (${bestRoute.legs[0].duration_in_traffic?.text || '45 mins'})\\n🌦️ Weather: ${weather.weather[0].description}, ${weather.main.temp}°C\\n🚧 Traffic: ${traffic.alerts[0] || 'No alerts'}`\n  }\n}];"
+      },
+      "name": "Decision Engine",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "authentication": "none",
+        "url": "https://slack.com/api/chat.postMessage",
+        "method": "POST",
+        "options": {},
+        "bodyParameters": {
+          "channel": "#commute",
+          "text": "={{$json[\"message\"]}}"
+        },
+        "headers": {
+          "Authorization": "Bearer {{$credentials.slackApiToken}}",
+          "Content-Type": "application/json"
+        }
+      },
+      "name": "Send Slack Notification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [1350, 300],
+      "credentials": { "httpBasicAuth": "Slack API" }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [{ "node": "Dynamic Route Selector", "type": "main", "index": 0 }],
+        [{ "node": "Weather API", "type": "main", "index": 0 }]
+      ]
+    },
+    "Dynamic Route Selector": {
+      "main": [[{ "node": "Google Maps Routes", "type": "main", "index": 0 }]]
+    },
+    "Weather API": {
+      "main": [[{ "node": "Merge Data", "type": "main", "index": 0 }]]
+    },
+    "Traffic News": {
+      "main": [[{ "node": "Merge Data", "type": "main", "index": 1 }]]
+    },
+    "Google Maps Routes": {
+      "main": [[{ "node": "Decision Engine", "type": "main", "index": 0 }]]
+    },
+    "Merge Data": {
+      "main": [[{ "node": "Decision Engine", "type": "main", "index": 1 }]]
+    },
+    "Decision Engine": {
+      "main": [[{ "node": "Send Slack Notification", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false
+}

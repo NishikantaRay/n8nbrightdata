@@ -1,0 +1,94 @@
+{
+  "name": "Smart Commute Assistant (Dummy Data - Bangalore - Sequential)",
+  "nodes": [
+    {
+      "parameters": {},
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "return [{ json: { weather: \"Clear\", temperature: \"28°C\" } }];"
+      },
+      "name": "Dummy Weather",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "return [{ json: { alerts: \"Accident on Outer Ring Road near Marathahalli\" } }];"
+      },
+      "name": "Dummy Traffic News",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [750, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "return [{ json: { routes: [ { summary: \"Route A (Via Outer Ring Road)\", duration: \"1h 20m\" }, { summary: \"Route B (Via Indiranagar)\", duration: \"1h 40m\" }, { summary: \"Route C (Via Koramangala)\", duration: \"1h 35m\" } ] } }];"
+      },
+      "name": "Dummy Google Maps",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1000, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Collect results from previous nodes\nconst weather = $node[\"Dummy Weather\"].json;\nconst traffic = $node[\"Dummy Traffic News\"].json;\nconst routes = $node[\"Dummy Google Maps\"].json.routes;\n\nlet bestRoute = routes[0];\n\n// Rule: avoid ORR if accident is reported\nif (traffic.alerts.includes(\"Accident\") && bestRoute.summary.includes(\"Outer Ring Road\")) {\n  bestRoute = routes[1];\n}\n\nreturn [{\n  json: {\n    message: `Good morning! Weather in Bangalore: ${weather.weather}, ${weather.temperature}.\\nTraffic alert: ${traffic.alerts}.\\nRecommended route: ${bestRoute.summary} (${bestRoute.duration}).`\n  }\n}];"
+      },
+      "name": "Decision Engine",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "return [{ json: { notification: $json.message } }];"
+      },
+      "name": "Send Notification",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1500, 300]
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          { "node": "Dummy Weather", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Dummy Weather": {
+      "main": [
+        [
+          { "node": "Dummy Traffic News", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Dummy Traffic News": {
+      "main": [
+        [
+          { "node": "Dummy Google Maps", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Dummy Google Maps": {
+      "main": [
+        [
+          { "node": "Decision Engine", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Decision Engine": {
+      "main": [
+        [
+          { "node": "Send Notification", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  }
+}
