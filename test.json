@@ -1,0 +1,113 @@
+{
+  "name": "Weather Data Every Minute (Enhanced)",
+  "nodes": [
+    {
+      "parameters": {
+        "triggerTimes": [
+          {
+            "mode": "everyMinute"
+          }
+        ]
+      },
+      "name": "Cron",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [150, 300]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "city",
+              "value": "London"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Set City",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [350, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const conditions = ['Sunny', 'Cloudy', 'Rainy', 'Windy', 'Snowy'];\nreturn [{\n  json: {\n    city: $json.city,\n    temperature: Math.floor(Math.random() * 16) + 15, // 15-30\n    condition: conditions[Math.floor(Math.random() * conditions.length)],\n    humidity: Math.floor(Math.random() * 41) + 40, // 40-80\n    wind: Math.floor(Math.random() * 21) + 5 // 5-25\n  }\n}];"
+      },
+      "name": "Random Weather",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [550, 300]
+    },
+    {
+      "parameters": {
+        "value": "={{$now}}",
+        "custom": true,
+        "toFormat": "yyyy-MM-dd HH:mm:ss",
+        "options": {}
+      },
+      "name": "Date & Time",
+      "type": "n8n-nodes-base.dateTime",
+      "typeVersion": 1,
+      "position": [750, 300]
+    },
+    {
+      "parameters": {
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [950, 300]
+    }
+  ],
+  "connections": {
+    "Cron": {
+      "main": [
+        [
+          {
+            "node": "Set City",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set City": {
+      "main": [
+        [
+          {
+            "node": "Random Weather",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Random Weather": {
+      "main": [
+        [
+          {
+            "node": "Date & Time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Date & Time": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false
+}
